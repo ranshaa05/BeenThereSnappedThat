@@ -1,3 +1,7 @@
+#user-content-ignore
+.kmz
+.kml
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
