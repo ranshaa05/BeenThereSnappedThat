@@ -43,16 +43,15 @@ def smooth_gps_track(
 
     corrected_photos = [p.copy() for p in photos]
     total_corrections = 0
-    EPS_DIST = 1e-6
 
     for pass_num in range(1, max_passes + 1):
-        this_pass_corrections = 0
+        corrections_made = 0
         i = 1
+        
         while i < len(corrected_photos) - 1:
-            prev_p = corrected_photos[i - 1]
-            curr_p = corrected_photos[i]
-            next_p = corrected_photos[i + 1]
+            prev_p, curr_p, next_p = corrected_photos[i-1:i+2]
 
+            # Calculate time deltas
             dt_total = (next_p['time'] - prev_p['time']).total_seconds()
             dt1 = (curr_p['time'] - prev_p['time']).total_seconds()
             dt2 = (next_p['time'] - curr_p['time']).total_seconds()
@@ -61,54 +60,52 @@ def smooth_gps_track(
                 i += 1
                 continue
 
+            # Calculate distances
             d_total = haversine(prev_p['lat'], prev_p['lon'], next_p['lat'], next_p['lon'])
             d1 = haversine(prev_p['lat'], prev_p['lon'], curr_p['lat'], curr_p['lon'])
             d2 = haversine(curr_p['lat'], curr_p['lon'], next_p['lat'], next_p['lon'])
 
-            speed1 = (d1 / dt1) * 3600
-            speed2 = (d2 / dt2) * 3600
-
-            speed_outlier = speed_enabled and (speed1 > max_speed_kmh or speed2 > max_speed_kmh)
-            geo_outlier = geo_enabled and ((d1 + d2) > (d_total * geo_detour_factor + EPS_DIST) and d_total > geo_min_direct_km)
-
-            ocean_outlier = False
-            if ocean_enabled and HAS_LAND_MASK:
+            # Check for outliers
+            reasons = []
+            
+            if speed_enabled:
+                max_speed = max((d1 / dt1) * 3600, (d2 / dt2) * 3600)
+                if max_speed > max_speed_kmh:
+                    reasons.append(f"speed {max_speed:.0f}km/h")
+            
+            if geo_enabled and d_total > geo_min_direct_km:
+                if (d1 + d2) > (d_total * geo_detour_factor + 1e-6):
+                    reasons.append(f"detour>{geo_detour_factor}x")
+            
+            if ocean_enabled and HAS_LAND_MASK and d_total <= ocean_max_direct_km:
                 try:
-                    on_land_prev = globe.is_land(prev_p['lat'], prev_p['lon'])
-                    on_land_curr = globe.is_land(curr_p['lat'], curr_p['lon'])
-                    on_land_next = globe.is_land(next_p['lat'], next_p['lon'])
-                    if not on_land_curr and on_land_prev and on_land_next and d_total <= ocean_max_direct_km:
-                        ocean_outlier = True
+                    land_status = [globe.is_land(p['lat'], p['lon']) for p in [prev_p, curr_p, next_p]]
+                    if not land_status[1] and land_status[0] and land_status[2]:
+                        reasons.append("ocean glitch")
                 except Exception:
                     pass
 
-            if not (speed_outlier or geo_outlier or ocean_outlier):
+            if not reasons:
                 i += 1
                 continue
 
-            # Interpolate a new point
+            # Interpolate correction
             factor = dt1 / dt_total
-            new_lat = prev_p['lat'] + factor * (next_p['lat'] - prev_p['lat'])
-            new_lon = prev_p['lon'] + factor * (next_p['lon'] - prev_p['lon'])
-
-            reasons = []
-            if speed_outlier: reasons.append(f"speed {max(speed1, speed2):.0f}km/h")
-            if geo_outlier: reasons.append(f"detour>{geo_detour_factor}x")
-            if ocean_outlier: reasons.append("ocean glitch")
+            curr_p.update({
+                'lat': prev_p['lat'] + factor * (next_p['lat'] - prev_p['lat']),
+                'lon': prev_p['lon'] + factor * (next_p['lon'] - prev_p['lon']),
+                'corrected': True,
+                'corrected_reason': ', '.join(reasons)
+            })
 
             print(f"  [Fix] Pass {pass_num}: Correcting {os.path.basename(curr_p['path'])} ({', '.join(reasons)})")
-
-            curr_p['lat'] = new_lat
-            curr_p['lon'] = new_lon
-            curr_p['corrected'] = True
-            curr_p['corrected_reason'] = ', '.join(reasons)
-            this_pass_corrections += 1
+            corrections_made += 1
             total_corrections += 1
             i += 1
 
-        if this_pass_corrections == 0:
+        if not corrections_made:
             break
 
-    if total_corrections > 0:
+    if total_corrections:
         print(f"GPS smoothing complete: {total_corrections} correction(s) in {pass_num} pass(es).")
     return corrected_photos

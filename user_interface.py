@@ -11,20 +11,11 @@ from InquirerPy.base.control import Choice
 from InquirerPy.separator import Separator
 from gps_smoother import HAS_LAND_MASK
 
-def validate_int_range(min_val, max_val):
+def validate_range(min_val, max_val, type_func=float):
+    """Creates a validator for numeric ranges."""
     def validator(value):
         try:
-            num = int(value)
-            return min_val <= num <= max_val
-        except ValueError:
-            return False
-    return validator
-
-def validate_float_range(min_val, max_val):
-    def validator(value):
-        try:
-            num = float(value)
-            return min_val <= num <= max_val
+            return min_val <= type_func(value) <= max_val
         except ValueError:
             return False
     return validator
@@ -96,9 +87,9 @@ def configure_smoothing() -> tuple[bool, float, bool, float, bool, float]:
         max_speed_kmh = inquirer.text(
             message="Maximum speed (km/h):",
             default="250",
-            validate=validate_int_range(50, 1000),
+            validate=validate_range(50, 1000, int),
             invalid_message="Enter a number between 50 and 1000",
-            filter=lambda v: float(v),
+            filter=float,
         ).execute()
 
     geo_factor = 5.0
@@ -106,9 +97,9 @@ def configure_smoothing() -> tuple[bool, float, bool, float, bool, float]:
         geo_factor = inquirer.text(
             message="Detour factor (e.g., 5.0 = 5x longer than direct path):",
             default="5.0",
-            validate=validate_float_range(2.0, 20.0),
+            validate=validate_range(2.0, 20.0),
             invalid_message="Enter a number between 2.0 and 20.0",
-            filter=lambda v: float(v),
+            filter=float,
         ).execute()
 
     ocean_max_direct_km = 1.0
@@ -116,9 +107,9 @@ def configure_smoothing() -> tuple[bool, float, bool, float, bool, float]:
         ocean_max_direct_km = inquirer.text(
             message="Max distance for ocean glitch fix (km):",
             default="1.0",
-            validate=validate_float_range(0.1, 10.0),
+            validate=validate_range(0.1, 10.0),
             invalid_message="Enter a number between 0.1 and 10.0",
-            filter=lambda v: float(v),
+            filter=float,
         ).execute()
 
     print("\n" + "=" * 60)
