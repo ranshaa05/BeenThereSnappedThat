@@ -1,6 +1,6 @@
 # BeenThereSnappedThat
 
-Turn your geotagged photos into interactive trip maps! This tool extracts GPS coordinates and timestamps from your photos to create KMZ files that can be viewed in Google Earth.
+Turn your geotagged photos into interactive trip maps! This tool extracts GPS coordinates and timestamps from your photos to create KMZ files that can be viewed in Google Earth Pro.
 
 ## Features
 
