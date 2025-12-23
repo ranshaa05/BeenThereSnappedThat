@@ -6,7 +6,7 @@ Generates KML content for the trip.
 
 import html
 import os
-from image_processing import safe_jpeg_name
+from image_processing import safe_webp_name
 
 def create_kml_content(photos: list, trip_name: str) -> str:
     """Generates the KML content as a string, including a path and photo placemarks."""
@@ -15,8 +15,8 @@ def create_kml_content(photos: list, trip_name: str) -> str:
     # Build photo placemarks
     placemarks = []
     for i, photo in enumerate(photos):
-        jpeg_name = safe_jpeg_name(i + 1)
-        img_src = f"images/{jpeg_name}"
+        webp_name = safe_webp_name(i + 1)
+        img_src = f"images/{webp_name}"
         description = f'<![CDATA[<img src="{img_src}" width="800" /><br/>{html.escape(os.path.basename(photo["path"]))}]]>'
         
         placemarks.append(f'''    <Placemark>

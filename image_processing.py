@@ -9,11 +9,11 @@ from PIL import Image
 
 Image.MAX_IMAGE_PIXELS = None
 
-def safe_jpeg_name(idx: int) -> str:
+def safe_webp_name(idx: int) -> str:
     """Generates a safe filename for the image in the KMZ."""
-    return f"photo_{idx:04d}.jpg"
+    return f"photo_{idx:04d}.webp"
 
-def resize_to_jpeg(photo_path: str, idx: int):
+def resize_to_webp(photo_path: str, idx: int):
     """Resizes an image to fit within 800x600, letterboxing if necessary."""
     try:
         with Image.open(photo_path) as img:
@@ -30,18 +30,12 @@ def resize_to_jpeg(photo_path: str, idx: int):
             x, y = (800 - new_w) // 2, (600 - new_h) // 2
             canvas.paste(img, (x, y))
 
-            # Save with adaptive quality
+            # Save with 70% quality WebP
             buf = io.BytesIO()
-            canvas.save(buf, format='JPEG', quality=75, optimize=True, progressive=True)
-            jpeg_data = buf.getvalue()
-            
-            # Re-encode with lower quality if too large
-            if len(jpeg_data) > 350 * 1024:
-                buf = io.BytesIO()
-                canvas.save(buf, format='JPEG', quality=50, optimize=True)
-                jpeg_data = buf.getvalue()
+            canvas.save(buf, format='WEBP', quality=75, optimize=True, method=6)
+            webp_data = buf.getvalue()
 
-            return f"images/{safe_jpeg_name(idx)}", jpeg_data
+            return f"images/{safe_webp_name(idx)}", webp_data
 
     except Exception as e:
         print(f"  [Error] Could not resize {photo_path}: {e}")
