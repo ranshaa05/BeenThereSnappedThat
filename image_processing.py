@@ -4,8 +4,7 @@
 Handles image resizing for the KMZ generator.
 """
 
-import numpy as np
-import cv2
+import io
 from PIL import Image
 
 Image.MAX_IMAGE_PIXELS = None
@@ -17,39 +16,32 @@ def safe_jpeg_name(idx: int) -> str:
 def resize_to_jpeg(photo_path: str, idx: int):
     """Resizes an image to fit within 800x600, letterboxing if necessary."""
     try:
-        if (img := cv2.imread(photo_path, cv2.IMREAD_COLOR)) is None:
-            return None
+        with Image.open(photo_path) as img:
+            img = img.convert('RGB')
+            w, h = img.size
+            scale = min(800 / w, 600 / h)
+            new_w, new_h = int(w * scale), int(h * scale)
 
-        h, w = img.shape[:2]
-        scale = min(800 / w, 600 / h)
-        new_w, new_h = int(w * scale), int(h * scale)
+            # Resize image
+            img = img.resize((new_w, new_h), Image.LANCZOS)
 
-        # Resize image
-        img = cv2.resize(img, (new_w, new_h), interpolation=cv2.INTER_LANCZOS4)
+            # Create canvas and center image
+            canvas = Image.new('RGB', (800, 600), 'white')
+            x, y = (800 - new_w) // 2, (600 - new_h) // 2
+            canvas.paste(img, (x, y))
 
-        # Create canvas and center image
-        canvas = np.full((600, 800, 3), 255, dtype=np.uint8)
-        x, y = (800 - new_w) // 2, (600 - new_h) // 2
-        canvas[y:y+new_h, x:x+new_w] = img
-
-        # Encode with adaptive quality
-        quality = 75
-        encode_params = [cv2.IMWRITE_JPEG_QUALITY, quality,
-                        cv2.IMWRITE_JPEG_OPTIMIZE, 1,
-                        cv2.IMWRITE_JPEG_PROGRESSIVE, 1]
-        
-        success, buf = cv2.imencode('.jpg', canvas, encode_params)
-        if not success:
-            return None
+            # Save with adaptive quality
+            buf = io.BytesIO()
+            canvas.save(buf, format='JPEG', quality=75, optimize=True, progressive=True)
+            jpeg_data = buf.getvalue()
             
-        jpeg_data = buf.tobytes()
-        
-        # Re-encode with lower quality if too large
-        if len(jpeg_data) > 350 * 1024:
-            _, buf = cv2.imencode('.jpg', canvas, [cv2.IMWRITE_JPEG_QUALITY, 50])
-            jpeg_data = buf.tobytes()
+            # Re-encode with lower quality if too large
+            if len(jpeg_data) > 350 * 1024:
+                buf = io.BytesIO()
+                canvas.save(buf, format='JPEG', quality=50, optimize=True)
+                jpeg_data = buf.getvalue()
 
-        return f"images/{safe_jpeg_name(idx)}", jpeg_data
+            return f"images/{safe_jpeg_name(idx)}", jpeg_data
 
     except Exception as e:
         print(f"  [Error] Could not resize {photo_path}: {e}")
